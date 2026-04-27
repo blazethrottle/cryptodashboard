@@ -1,0 +1,26 @@
+{
+  "name": "crypto-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "X-VIP 포트폴리오 + 기관 포트폴리오 매매 시그널 대시보드",
+  "scripts": {
+    "snapshot": "tsx src/scripts/snapshot.ts",
+    "snapshot:core": "tsx src/scripts/snapshot.ts --universe=core",
+    "sync": "tsx src/scripts/sync-vault.ts",
+    "brief": "tsx src/scripts/brief.ts",
+    "institutions": "tsx src/scripts/institutions.ts",
+    "all": "npm run snapshot && npm run institutions && npm run sync && npm run brief",
+    "test:indicators": "tsx src/scripts/test-indicators.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "dotenv": "^17.4.2"
+  }
+}

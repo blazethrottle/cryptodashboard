@@ -1,0 +1,16 @@
+node_modules/
+node_modules.nosync/
+data/snapshots/
+data/cache/
+data/institutions/
+.env
+.env.local
+*.log
+.DS_Store
+dist/
+.next/
+.turbo/
+
+# Claude Code per-user permission overrides (push 안 함)
+.claude/settings.local.json
+
