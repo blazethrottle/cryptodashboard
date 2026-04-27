@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
-import { Activity, Clock, RefreshCcw, AlertTriangle, ExternalLink } from "lucide-react";
+import { Activity, Clock, RefreshCcw, AlertTriangle, ExternalLink, Bitcoin, Rocket, BarChart3 } from "lucide-react";
 import type { SnapshotFile } from "./types";
 import { fmtKR } from "./lib/format";
 import { MacroPanel } from "./components/MacroPanel";
 import { SignalCards } from "./components/SignalCards";
 import { AllCoinsTable } from "./components/AllCoinsTable";
 import { InstitutionMatrix } from "./components/InstitutionMatrix";
+import { BtcTrack } from "./components/BtcTrack";
+import { AltTrack } from "./components/AltTrack";
 
 const DATA_URL = `${import.meta.env.BASE_URL}data/snapshot.json`;
+
+type Track = "overview" | "btc" | "alt";
 
 export default function App() {
   const [data, setData] = useState<SnapshotFile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [track, setTrack] = useState<Track>("overview");
 
   const load = () => {
     setLoading(true);
@@ -31,7 +36,6 @@ export default function App() {
 
   useEffect(() => {
     load();
-    // 1분마다 자동 새로고침
     const id = setInterval(load, 60_000);
     return () => clearInterval(id);
   }, []);
@@ -45,7 +49,7 @@ export default function App() {
             Crypto Dashboard
           </h1>
           <p className="text-sm text-muted mt-1">
-            X-VIP 포트폴리오 + 7개 기관 보유 코인 매매 시그널 · RSI / MA / TVL hybrid
+            X-VIP 포트폴리오 + 7개 기관 보유 코인 · BTC 장기 + 알트 멀티배거 hybrid
           </p>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted">
@@ -66,6 +70,19 @@ export default function App() {
         </div>
       </header>
 
+      {/* 트랙 토글 */}
+      <nav className="flex items-center gap-2 mb-6 border-b border-border pb-3">
+        <TrackBtn active={track === "overview"} onClick={() => setTrack("overview")} icon={<BarChart3 className="w-4 h-4" />}>
+          Overview
+        </TrackBtn>
+        <TrackBtn active={track === "btc"} onClick={() => setTrack("btc")} icon={<Bitcoin className="w-4 h-4 text-warn" />}>
+          BTC 장기
+        </TrackBtn>
+        <TrackBtn active={track === "alt"} onClick={() => setTrack("alt")} icon={<Rocket className="w-4 h-4 text-buy" />}>
+          알트 멀티배거
+        </TrackBtn>
+      </nav>
+
       {error && (
         <div className="rounded-xl border border-sell/40 bg-sell/10 text-sell p-4 mb-4 flex items-start gap-2">
           <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
@@ -73,8 +90,7 @@ export default function App() {
             <p className="font-medium">데이터 불러오기 실패</p>
             <p className="text-xs mt-1 opacity-80">{error}</p>
             <p className="text-xs mt-2 opacity-70">
-              `npm run snapshot` 실행 후 `web/public/data/snapshot.json`으로 복사되어야 합니다. GitHub Actions가
-              30분마다 자동 갱신합니다.
+              GitHub Actions가 30분마다 자동 갱신합니다. Settings → Pages 활성화 후 첫 workflow 실행되면 자동 표시됩니다.
             </p>
           </div>
         </div>
@@ -88,15 +104,47 @@ export default function App() {
       )}
 
       {data && (
-        <div className="space-y-6">
-          <MacroPanel macro={data.macro} />
-          <SignalCards rows={data.rows} />
-          <InstitutionMatrix rows={data.rows} />
-          <AllCoinsTable rows={data.rows} />
+        <>
+          {track === "overview" && (
+            <div className="space-y-6">
+              <MacroPanel macro={data.macro} />
+              <SignalCards rows={data.rows} />
+              <InstitutionMatrix rows={data.rows} />
+              <AllCoinsTable rows={data.rows} />
+            </div>
+          )}
+          {track === "btc" && <BtcTrack macro={data.macro} rows={data.rows} />}
+          {track === "alt" && <AltTrack macro={data.macro} rows={data.rows} />}
           <Footer data={data} />
-        </div>
+        </>
       )}
     </main>
+  );
+}
+
+function TrackBtn({
+  active,
+  onClick,
+  children,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition ${
+        active
+          ? "bg-surface border border-b-transparent border-border text-text"
+          : "text-muted hover:text-text"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
@@ -107,7 +155,7 @@ function Footer({ data }: { data: SnapshotFile }) {
     <footer className="text-xs text-muted border-t border-border pt-4 mt-8">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 justify-between">
         <span>
-          {valid} 코인 분석 · {errs} 실패 · 데이터 60초 마다 자동 새로고침
+          {valid} 코인 분석 · {errs} 실패 · 60초 자동 새로고침
         </span>
         <span className="flex items-center gap-3">
           <a
@@ -121,8 +169,7 @@ function Footer({ data }: { data: SnapshotFile }) {
         </span>
       </div>
       <p className="mt-2 opacity-60">
-        매수 기준: 주봉 RSI ≤30 (장기), 일봉 RSI ≤50 + 50일선 돌파 (단/중기), 200MA 위 + 상향 추세 (보조) ·
-        매도 기준: 주봉 RSI ≥70 (장기), 일봉 RSI ≥80 (단/중기), 200MA 하향 돌파 + 지속 하락 (보조)
+        BTC 장기: 사이클 정점/바닥 회피 (MVRV-Z, 200WMA, 사이클 위치) · 알트: 100~1000% 멀티배거 발굴 (6 체크리스트 + Contrarian)
       </p>
     </footer>
   );

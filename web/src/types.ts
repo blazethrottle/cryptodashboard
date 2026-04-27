@@ -91,11 +91,106 @@ export interface StablecoinSnapshot {
   change30dPct: number;
 }
 
+export interface FearGreedDay {
+  value: number;
+  classification: string;
+  timestamp: number;
+}
+
+export interface FearGreedSnapshot {
+  current: FearGreedDay;
+  yesterday?: FearGreedDay;
+  weekAgo?: FearGreedDay;
+  monthAgo?: FearGreedDay;
+  series30d: FearGreedDay[];
+}
+
+export interface GlobalMarket {
+  totalMarketCapUsd: number;
+  totalVolumeUsd: number;
+  btcDominance: number;
+  ethDominance: number;
+  marketCapChangePct24h: number;
+}
+
+export interface CategoryStat {
+  id: string;
+  name: string;
+  marketCapUsd: number;
+  change24hPct: number;
+  topCoins: string[];
+}
+
+export interface MvrvZ {
+  date: string;
+  mvrv: number;
+  mvrvZ: number;
+  price: number;
+}
+
+export interface BtcCycleSnapshot {
+  current: MvrvZ;
+  yesterday?: MvrvZ;
+  weekAgo?: MvrvZ;
+  monthAgo?: MvrvZ;
+  series365d: MvrvZ[];
+  cycleState: "cycle-bottom" | "accumulation" | "growth" | "euphoria" | "cycle-top";
+}
+
+export interface AltSeasonSignal {
+  state: "alt-season" | "alt-coming" | "btc-dominant" | "extreme-btc";
+  comment: string;
+}
+
+export interface PerpSnapshot {
+  symbol: string;
+  fundingRate: number;
+  annualizedFundingPct: number;
+  openInterestUsd: number;
+  oiChange24hPct: number;
+  longShortRatio: number;
+  longShortTrend: "rising" | "falling" | "flat";
+}
+
+export interface MultibaggerScore {
+  base: string;
+  total: number;
+  checks: {
+    tvlGrowth: boolean;
+    categoryHot: boolean;
+    perpBullish: boolean;
+    rsiOversold: boolean;
+    contrarianFear: boolean;
+    smallCap: boolean;
+  };
+  reasons: string[];
+  rating: "candidate" | "watch" | "weak";
+}
+
 export interface Macro {
   btc?: BtcNetworkState;
   sol?: SolNetworkState;
   chains: Record<string, ChainTvl | null>;
   stablecoins?: StablecoinSnapshot;
+  fearGreed?: FearGreedSnapshot;
+  global?: GlobalMarket;
+  categories?: CategoryStat[];
+  altSeason?: AltSeasonSignal;
+  btcCycle?: BtcCycleSnapshot;
+}
+
+export interface CandleFile {
+  base: string;
+  name: string;
+  candles: Array<{
+    openTime: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    closeTime: number;
+  }>;
 }
 
 export type Institution =
@@ -106,6 +201,7 @@ export interface Row {
   holders: Institution[];
   source?: string;
   result?: SignalSnapshot;
+  multibagger?: MultibaggerScore;
   error?: string;
 }
 

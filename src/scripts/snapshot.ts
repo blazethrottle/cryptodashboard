@@ -60,6 +60,8 @@ interface CoinResult {
   result?: SignalSnapshot;
   source?: Source | string;
   multibagger?: MultibaggerScore;
+  /** 차트 raw — saveCandles에서만 사용 후 메모리 해제 (snapshot.json엔 미포함) */
+  rawDaily?: import("../lib/exchanges/binance.ts").Candle[];
   error?: string;
 }
 
@@ -119,10 +121,34 @@ async function processCoin(
       multibagger = computeMultibaggerScore({ coin, signal: result, marketCapUsd: null });
     }
 
-    return { coin, result, source, multibagger };
+    return { coin, result, source, multibagger, rawDaily: daily.candles };
   } catch (err) {
     return { coin, error: (err as Error).message };
   }
+}
+
+/**
+ * priority + 시그널 발동 코인의 일봉 candles를 web/public/data/candles/<base>.json 으로 저장.
+ * 차트용 raw 데이터. snapshot.json에는 미포함.
+ */
+async function saveCandles(rows: CoinResult[]): Promise<number> {
+  const dir = path.join(REPO_ROOT, "web", "public", "data", "candles");
+  await fs.mkdir(dir, { recursive: true });
+  const targets = rows.filter(
+    (r) => r.rawDaily && (r.coin.priority || (r.result && r.result.level !== "NEUTRAL")),
+  );
+  let count = 0;
+  for (const r of targets) {
+    const file = path.join(dir, `${r.coin.base}.json`);
+    const payload = {
+      base: r.coin.base,
+      name: r.coin.name,
+      candles: r.rawDaily!.slice(-365), // 1년치만
+    };
+    await fs.writeFile(file, JSON.stringify(payload));
+    count++;
+  }
+  return count;
 }
 
 async function fetchOnchainForUniverse(coins: Coin[]): Promise<{
@@ -428,6 +454,9 @@ async function main(): Promise<void> {
 
   const file = await saveSnapshot(rows, macro);
   console.log(`${COLORS.dim}💾 ${path.relative(REPO_ROOT, file)}${COLORS.reset}`);
+
+  const candleCount = await saveCandles(rows);
+  console.log(`${COLORS.dim}📈 ${candleCount} 코인 candles → web/public/data/candles/${COLORS.reset}`);
 
   const errs = rows.filter((r) => r.error);
   if (errs.length > 0) {
