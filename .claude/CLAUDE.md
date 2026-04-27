@@ -31,6 +31,14 @@
 3. 의미 단위 변경이면: `git add . && git commit && git push origin dev`
 4. README/CLAUDE.md에 영향 있으면 함께 업데이트
 
+## GitHub Pages 자동화
+
+- `.github/workflows/snapshot-deploy.yml` — 30분 cron + push trigger
+- 빌드: `dev` 브랜치 사용 (main 보호 정책 일관)
+- 단일 workflow에서 snapshot → web build → Pages deploy 모두 처리
+- snapshot.json은 git에 commit하지 않음 (Actions 시점에만 생성, .gitignore)
+- Actions 무료 사용량: cron 30분 = 일 48회 × ~2분 = 월 ~3000분 (public repo는 무제한)
+
 ## 모듈 책임
 
 - `src/lib/exchanges/` — Binance + CoinGecko (절대 secret 하드코딩 X)

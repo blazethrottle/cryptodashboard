@@ -1,0 +1,116 @@
+/**
+ * snapshot.json 형식 — 백엔드 src/scripts/snapshot.ts 출력과 동일.
+ */
+
+export type SignalLevel = "BUY_STRONG" | "BUY" | "WATCH" | "NEUTRAL" | "SELL" | "SELL_STRONG";
+
+export type Group =
+  | "core" | "layer1" | "layer1_2" | "rwa_defi" | "ai" | "meme" | "privacy" | "institution_only";
+
+export interface Coin {
+  base: string;
+  name: string;
+  groups: Group[];
+  priority: boolean;
+  coingeckoId?: string;
+  defillamaSlug?: string;
+  chain?: string;
+  notes?: string;
+}
+
+export interface ProtocolTvlMetrics {
+  slug: string;
+  name: string;
+  tvlUsd: number;
+  tvl7dChange: number;
+  tvl30dChange: number;
+  tvl90dChange: number;
+}
+
+export interface FeesSummary {
+  slug: string;
+  total24h?: number;
+  total7d?: number;
+  total30d?: number;
+  change_1d?: number;
+  change_7d?: number;
+  change_1m?: number;
+}
+
+export interface SignalSnapshot {
+  symbol: string;
+  base: string;
+  price: number;
+  rsiDaily: number;
+  rsiWeekly: number;
+  ma50: number;
+  ma200: number;
+  ma200Slope: number;
+  priceVs200: number;
+  priceVs50: number;
+  cross50Up: boolean;
+  cross200Down: boolean;
+  reasons: string[];
+  level: SignalLevel;
+  score: number;
+  onchain?: {
+    tvl?: ProtocolTvlMetrics | null;
+    fees?: FeesSummary | null;
+  };
+}
+
+export interface BtcNetworkState {
+  blockHeight: number;
+  feesSatPerVb: { fastest: number; halfHour: number; hour: number; minimum: number };
+  hashrate24hEhs: number;
+  difficulty: number;
+  difficultyChangePct: number;
+  mempoolCount: number;
+  mempoolVsizeMB: number;
+}
+
+export interface SolNetworkState {
+  slot: number;
+  epoch: number;
+  epochProgress: number;
+  tps5min: number;
+  inflationRate: number;
+  totalStakeSol: number;
+}
+
+export interface ChainTvl {
+  name: string;
+  tvl: number;
+  tvl7dChange: number;
+  tvl30dChange: number;
+}
+
+export interface StablecoinSnapshot {
+  totalUsd: number;
+  change7dPct: number;
+  change30dPct: number;
+}
+
+export interface Macro {
+  btc?: BtcNetworkState;
+  sol?: SolNetworkState;
+  chains: Record<string, ChainTvl | null>;
+  stablecoins?: StablecoinSnapshot;
+}
+
+export type Institution =
+  | "Grayscale" | "Bitwise" | "21Shares" | "CoinShares" | "Pantera" | "Galaxy Digital" | "Paradigm";
+
+export interface Row {
+  coin: Coin;
+  holders: Institution[];
+  source?: string;
+  result?: SignalSnapshot;
+  error?: string;
+}
+
+export interface SnapshotFile {
+  timestamp: string;
+  macro: Macro;
+  rows: Row[];
+}

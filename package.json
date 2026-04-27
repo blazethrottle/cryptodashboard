@@ -11,6 +11,11 @@
     "brief": "tsx src/scripts/brief.ts",
     "institutions": "tsx src/scripts/institutions.ts",
     "all": "npm run snapshot && npm run institutions && npm run sync && npm run brief",
+    "web:dev": "cd web && npm run dev",
+    "web:build": "cd web && npm run build",
+    "web:preview": "cd web && npm run preview",
+    "web:install": "cd web && npm install",
+    "web:snapshot": "npm run snapshot && mkdir -p web/public/data && LATEST=$(ls -t data/snapshots/*.json | head -1) && cp \"$LATEST\" web/public/data/snapshot.json && echo \"snapshot copied: $LATEST\"",
     "test:indicators": "tsx src/scripts/test-indicators.ts",
     "typecheck": "tsc --noEmit"
   },

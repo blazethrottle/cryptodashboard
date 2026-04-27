@@ -1,4 +1,5 @@
 node_modules/
+**/node_modules/
 node_modules.nosync/
 data/snapshots/
 data/cache/
@@ -8,8 +9,12 @@ data/institutions/
 *.log
 .DS_Store
 dist/
+**/dist/
 .next/
 .turbo/
+
+# 웹 빌드 시점에만 들어가는 데이터 (Actions가 자동 갱신)
+web/public/data/snapshot.json
 
 # Claude Code per-user permission overrides (push 안 함)
 .claude/settings.local.json

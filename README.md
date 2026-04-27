@@ -33,6 +33,27 @@ npm run brief                 # Claude Sonnet 4.6 + Vault context로 LLM brief
 npm run all                   # snapshot → institutions → sync → brief
 ```
 
+## 웹 대시보드 (GitHub Pages)
+
+배포 URL (Actions 첫 실행 후): **https://blazethrottle.github.io/cryptodashboard/**
+
+**자동화 정책**:
+- 30분마다 GitHub Actions가 자동 실행 → Binance/CoinGecko/DefiLlama 데이터 수집 → Pages 재배포
+- 사용자는 URL만 열면 항상 최신 시그널 (60초 자동 새로고침)
+- 페이지 1분 이내 새로고침으로 매크로/매수후보/기관 매트릭스/전체 분포 확인
+
+**최초 1회 셋업** (사용자 직접):
+1. https://github.com/blazethrottle/cryptodashboard/settings/pages 접속
+2. "Build and deployment" 섹션 → Source: **GitHub Actions** 선택
+3. 저장 → 첫 workflow는 다음 30분 cron 또는 https://github.com/blazethrottle/cryptodashboard/actions 에서 "Run workflow" 수동 실행
+
+**로컬 개발/미리보기**:
+```bash
+npm run web:install      # 1회
+npm run web:snapshot     # 백엔드 snapshot → web/public/data/ 복사
+npm run web:dev          # http://localhost:5173 으로 미리보기
+```
+
 ## Git 워크플로우
 
 **Repo**: https://github.com/blazethrottle/cryptodashboard
