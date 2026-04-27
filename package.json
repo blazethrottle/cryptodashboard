@@ -16,6 +16,7 @@
     "web:preview": "cd web && npm run preview",
     "web:install": "cd web && npm install",
     "web:snapshot": "npm run snapshot && mkdir -p web/public/data && LATEST=$(ls -t data/snapshots/*.json | head -1) && cp \"$LATEST\" web/public/data/snapshot.json && echo \"snapshot copied: $LATEST\"",
+    "backtest": "tsx src/scripts/backtest.ts",
     "test:indicators": "tsx src/scripts/test-indicators.ts",
     "typecheck": "tsc --noEmit"
   },

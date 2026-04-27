@@ -4,6 +4,7 @@ node_modules.nosync/
 data/snapshots/
 data/cache/
 data/institutions/
+data/backtests/
 .env
 .env.local
 *.log
