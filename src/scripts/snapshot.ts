@@ -17,6 +17,21 @@ import { filterUniverse, holdersOf, type Coin } from "../lib/universe.ts";
 import { fetchProtocolTvl, fetchProtocolFees, fetchChainTvl, fetchStablecoinSupply, type ProtocolTvlMetrics, type FeesSummary, type ChainTvl, type StablecoinSnapshot } from "../lib/onchain/defillama.ts";
 import { fetchBtcNetwork, type BtcNetworkState } from "../lib/onchain/btc.ts";
 import { fetchSolNetwork, type SolNetworkState } from "../lib/onchain/sol.ts";
+import { fetchFearGreed, type FearGreedSnapshot } from "../lib/macro/fear-greed.ts";
+import { fetchGlobalMarket, fetchCategories, altSeasonSignal, type GlobalMarket, type CategoryStat } from "../lib/macro/coingecko-global.ts";
+import { fetchBtcCycle, btcCycleScore, type BtcCycleSnapshot } from "../lib/onchain/coinmetrics.ts";
+import { fetchPerpSnapshot, type PerpSnapshot } from "../lib/exchanges/binance-futures.ts";
+import { computeMultibaggerScore, type MultibaggerScore } from "../lib/multibagger.ts";
+
+/** universe groups → CoinGecko category id 매핑 (가능한 것만, 없으면 null) */
+const GROUP_TO_CG_CATEGORY: Record<string, string> = {
+  ai: "artificial-intelligence",
+  rwa_defi: "real-world-assets-rwa",
+  meme: "meme-token",
+  privacy: "privacy-coins",
+  layer1: "layer-1",
+  layer1_2: "layer-2",
+};
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -44,6 +59,7 @@ interface CoinResult {
   coin: Coin;
   result?: SignalSnapshot;
   source?: Source | string;
+  multibagger?: MultibaggerScore;
   error?: string;
 }
 
@@ -52,18 +68,35 @@ interface MacroContext {
   sol?: SolNetworkState;
   chains: Record<string, ChainTvl | null>;
   stablecoins?: StablecoinSnapshot;
+  fearGreed?: FearGreedSnapshot;
+  global?: GlobalMarket;
+  categories?: CategoryStat[];
+  altSeason?: ReturnType<typeof altSeasonSignal>;
+  btcCycle?: BtcCycleSnapshot;
 }
 
 async function processCoin(
   coin: Coin,
   tvlByBase: Map<string, ProtocolTvlMetrics | null>,
   feesByBase: Map<string, FeesSummary | null>,
+  perpByBase: Map<string, PerpSnapshot | null>,
+  macro: MacroContext,
 ): Promise<CoinResult> {
   try {
     const [daily, weekly] = await Promise.all([
       fetchCandlesWithFallback(coin, "1d", 400),
       fetchCandlesWithFallback(coin, "1w", 200),
     ]);
+
+    // 카테고리 매핑 — coin의 첫 그룹 → CG category id → categories에서 30d 변화율
+    let categoryChange30d: number | null = null;
+    const groupId = coin.groups[0];
+    const cgId = groupId ? GROUP_TO_CG_CATEGORY[groupId] : undefined;
+    if (cgId && macro.categories) {
+      const cat = macro.categories.find((c) => c.id === cgId);
+      if (cat) categoryChange30d = cat.change24hPct; // 30d 정확한 데이터는 별도 endpoint 필요. 24h로 우선
+    }
+
     const result = evaluate({
       base: coin.base,
       symbol: daily.symbol,
@@ -72,10 +105,21 @@ async function processCoin(
       onchain: {
         tvl: tvlByBase.get(coin.base) ?? null,
         fees: feesByBase.get(coin.base) ?? null,
+        perp: perpByBase.get(coin.base) ?? null,
+        fearGreed: macro.fearGreed?.current.value ?? null,
+        btcDominance: macro.global?.btcDominance ?? null,
+        categoryChange30d,
       },
     });
     const source = daily.source === weekly.source ? daily.source : `${daily.source}/${weekly.source}`;
-    return { coin, result, source };
+
+    // Multibagger Score (BTC 제외)
+    let multibagger: MultibaggerScore | undefined;
+    if (coin.base !== "BTC") {
+      multibagger = computeMultibaggerScore({ coin, signal: result, marketCapUsd: null });
+    }
+
+    return { coin, result, source, multibagger };
   } catch (err) {
     return { coin, error: (err as Error).message };
   }
@@ -84,13 +128,16 @@ async function processCoin(
 async function fetchOnchainForUniverse(coins: Coin[]): Promise<{
   tvl: Map<string, ProtocolTvlMetrics | null>;
   fees: Map<string, FeesSummary | null>;
+  perp: Map<string, PerpSnapshot | null>;
 }> {
   const tvl = new Map<string, ProtocolTvlMetrics | null>();
   const fees = new Map<string, FeesSummary | null>();
+  const perp = new Map<string, PerpSnapshot | null>();
   const slugged = coins.filter((c) => c.defillamaSlug);
 
-  await Promise.all(
-    slugged.map(async (c) => {
+  await Promise.all([
+    // DefiLlama TVL/fees
+    ...slugged.map(async (c) => {
       try {
         const t = await fetchProtocolTvl(c.defillamaSlug!);
         tvl.set(c.base, t);
@@ -104,13 +151,22 @@ async function fetchOnchainForUniverse(coins: Coin[]): Promise<{
         fees.set(c.base, null);
       }
     }),
-  );
+    // Binance Futures perp (모든 코인 시도, 실패 시 null)
+    ...coins.map(async (c) => {
+      try {
+        const p = await fetchPerpSnapshot(c.base);
+        perp.set(c.base, p);
+      } catch {
+        perp.set(c.base, null);
+      }
+    }),
+  ]);
 
-  return { tvl, fees };
+  return { tvl, fees, perp };
 }
 
 async function fetchMacro(): Promise<MacroContext> {
-  const [btcRes, solRes, chainsRes, stableRes] = await Promise.allSettled([
+  const [btcRes, solRes, chainsRes, stableRes, fgRes, globalRes, catsRes, cycleRes] = await Promise.allSettled([
     fetchBtcNetwork(),
     fetchSolNetwork(),
     Promise.all([
@@ -121,6 +177,10 @@ async function fetchMacro(): Promise<MacroContext> {
       fetchChainTvl("Base"),
     ]),
     fetchStablecoinSupply(),
+    fetchFearGreed(),
+    fetchGlobalMarket(),
+    fetchCategories(),
+    fetchBtcCycle(365),
   ]);
   const chains: Record<string, ChainTvl | null> = {};
   if (chainsRes.status === "fulfilled") {
@@ -131,11 +191,17 @@ async function fetchMacro(): Promise<MacroContext> {
     chains.Arbitrum = arb;
     chains.Base = base;
   }
+  const global = globalRes.status === "fulfilled" ? globalRes.value : undefined;
   return {
     btc: btcRes.status === "fulfilled" ? btcRes.value : undefined,
     sol: solRes.status === "fulfilled" ? solRes.value : undefined,
     chains,
     stablecoins: stableRes.status === "fulfilled" ? (stableRes.value ?? undefined) : undefined,
+    fearGreed: fgRes.status === "fulfilled" ? fgRes.value : undefined,
+    global,
+    categories: catsRes.status === "fulfilled" ? catsRes.value : undefined,
+    altSeason: global ? altSeasonSignal(global.btcDominance) : undefined,
+    btcCycle: cycleRes.status === "fulfilled" ? cycleRes.value : undefined,
   };
 }
 
@@ -227,6 +293,34 @@ function printMacro(macro: MacroContext): void {
     const trend = s.change30dPct >= 0 ? c.green : c.red;
     console.log(`  ${c.green}💵${c.reset}  Stablecoins ${fmtUsdShort(s.totalUsd)}  ${trend}${pct(s.change7dPct).trim()}/7d  ${pct(s.change30dPct).trim()}/30d${c.reset}  ${c.dim}(매수 대기 자금)${c.reset}`);
   }
+  // F&G + BTC dominance + alt season
+  if (macro.fearGreed) {
+    const fg = macro.fearGreed.current;
+    const fgColor = fg.value <= 25 ? c.red : fg.value >= 75 ? c.green : c.dim;
+    console.log(`  ${c.yellow}😨${c.reset}  Fear & Greed ${fgColor}${fg.value}${c.reset} (${fg.classification})`);
+  }
+  if (macro.global) {
+    const dom = (macro.global.btcDominance * 100).toFixed(1);
+    const altText = macro.altSeason?.comment ?? "";
+    console.log(`  ${c.yellow}₿${c.reset}  BTC dominance ${c.bold}${dom}%${c.reset}  ${c.dim}${altText}${c.reset}`);
+  }
+  // BTC 사이클 (MVRV-Z) — Track 1 핵심
+  if (macro.btcCycle) {
+    const z = macro.btcCycle.current.mvrvZ;
+    const state = macro.btcCycle.cycleState;
+    const stateLabel: Record<string, string> = {
+      "cycle-bottom": `${c.green}바닥 (강한 매수)${c.reset}`,
+      accumulation: `${c.green}축적${c.reset}`,
+      growth: `${c.cyan}성장${c.reset}`,
+      euphoria: `${c.yellow}과열${c.reset}`,
+      "cycle-top": `${c.red}정점 (강한 매도)${c.reset}`,
+    };
+    const score = btcCycleScore(macro.btcCycle);
+    console.log(`  ${c.yellow}🔆${c.reset}  BTC MVRV-Z ${c.bold}${z.toFixed(2)}${c.reset}  ${stateLabel[state]} ${c.dim}score ${score.score >= 0 ? "+" : ""}${score.score}${c.reset}`);
+    if (score.reasons.length > 0) {
+      for (const r of score.reasons) console.log(`     ${c.dim}↳ ${r}${c.reset}`);
+    }
+  }
 }
 
 function printTable(rows: CoinResult[]): void {
@@ -299,11 +393,12 @@ async function saveSnapshot(rows: CoinResult[], macro: MacroContext): Promise<st
   const payload = {
     timestamp: new Date().toISOString(),
     macro,
-    rows: rows.map(({ coin, result, source, error }) => ({
+    rows: rows.map(({ coin, result, source, multibagger, error }) => ({
       coin,
       holders: holdersOf(coin.base),
       source,
       result,
+      multibagger,
       error,
     })),
   };
@@ -317,13 +412,15 @@ async function main(): Promise<void> {
   console.log(`📡 ${coins.length} coins · universe=${universe} · concurrency=${concurrency} · onchain=${onchain}`);
 
   // 1. 온체인 데이터 (DefiLlama + 매크로) — 코인 fetch 동안 같이 돌아가게 병렬
-  const onchainPromise = onchain ? fetchOnchainForUniverse(coins) : Promise.resolve({ tvl: new Map(), fees: new Map() });
+  const onchainPromise = onchain
+    ? fetchOnchainForUniverse(coins)
+    : Promise.resolve({ tvl: new Map(), fees: new Map(), perp: new Map() });
   const macroPromise = onchain ? fetchMacro() : Promise.resolve({ chains: {} } as MacroContext);
 
-  const { tvl, fees } = await onchainPromise;
+  const { tvl, fees, perp } = await onchainPromise;
   const macro = await macroPromise;
 
-  const rows = await runWithConcurrency(coins, concurrency, (c) => processCoin(c, tvl, fees));
+  const rows = await runWithConcurrency(coins, concurrency, (c) => processCoin(c, tvl, fees, perp, macro));
 
   if (onchain) printMacro(macro);
   printTable(rows);

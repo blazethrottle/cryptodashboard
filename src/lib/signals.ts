@@ -14,6 +14,8 @@
 
 import type { Candle } from "./exchanges/binance.ts";
 import type { ProtocolTvlMetrics, FeesSummary } from "./onchain/defillama.ts";
+import type { PerpSnapshot } from "./exchanges/binance-futures.ts";
+import { perpScore } from "./exchanges/binance-futures.ts";
 import { rsi, sma, slope, crossedAbove, crossedBelow } from "./indicators.ts";
 
 export type SignalLevel = "BUY_STRONG" | "BUY" | "WATCH" | "NEUTRAL" | "SELL" | "SELL_STRONG";
@@ -21,6 +23,12 @@ export type SignalLevel = "BUY_STRONG" | "BUY" | "WATCH" | "NEUTRAL" | "SELL" | 
 export interface OnchainContext {
   tvl?: ProtocolTvlMetrics | null;
   fees?: FeesSummary | null;
+  perp?: PerpSnapshot | null;
+  /** 매크로 — 모든 코인이 공유 (snapshot fetch 1회) */
+  fearGreed?: number | null;        // 0–100
+  btcDominance?: number | null;     // 0–1
+  /** 코인이 속한 카테고리 30d 변화율 (CG categories) */
+  categoryChange30d?: number | null;
 }
 
 export interface SignalSnapshot {
@@ -145,6 +153,47 @@ export function evaluate({ base, symbol, daily, weekly, onchain }: SignalInputs)
     } else if (f <= -0.4) {
       reasons.push(`Fees ${(f * 100).toFixed(0)}% / 7d`);
       score -= 1;
+    }
+  }
+
+  // Perp 시그널 (funding/OI/LSR) — 단/중기 알트에 결정적
+  const perp = onchain?.perp;
+  if (perp) {
+    const ps = perpScore(perp);
+    score += ps.score;
+    for (const r of ps.reasons) reasons.push(r);
+  }
+
+  // Contrarian — Fear & Greed × RSI 결합
+  const fg = onchain?.fearGreed;
+  if (typeof fg === "number") {
+    if (fg <= 20 && rsiWeekly <= 40) {
+      reasons.push(`F&G ${fg} (Extreme Fear) + 주봉 RSI 약세 — Contrarian 매수 강화`);
+      score += 2;
+    } else if (fg <= 25) {
+      reasons.push(`F&G ${fg} (Extreme Fear)`);
+      score += 1;
+    } else if (fg >= 80 && rsiWeekly >= 60) {
+      reasons.push(`F&G ${fg} (Extreme Greed) + 주봉 RSI 강세 — Contrarian 매도 강화`);
+      score -= 2;
+    } else if (fg >= 75) {
+      reasons.push(`F&G ${fg} (Extreme Greed)`);
+      score -= 1;
+    }
+  }
+
+  // Narrative (CG category 30d) — 알트 트랙
+  const cat30 = onchain?.categoryChange30d;
+  if (typeof cat30 === "number" && Math.abs(cat30) < 5) {  // 5배 이상은 outlier
+    if (cat30 >= 0.5) {
+      reasons.push(`카테고리 30d +${(cat30 * 100).toFixed(0)}% (narrative 강세)`);
+      score += 1;
+    } else if (cat30 >= 1.0) {
+      reasons.push(`카테고리 30d +${(cat30 * 100).toFixed(0)}% (narrative 폭발)`);
+      score += 2;
+    } else if (cat30 <= -0.3) {
+      reasons.push(`카테고리 30d ${(cat30 * 100).toFixed(0)}% (narrative 침체 — Contrarian 기회)`);
+      // 음수 score 안 함 — 침체 자체는 매수 기회 가능 (Contrarian)
     }
   }
 
