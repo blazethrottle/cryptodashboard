@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import { fetchCandlesWithFallback, type Source } from "../lib/exchanges/aggregator.ts";
 import { evaluate, type SignalSnapshot } from "../lib/signals.ts";
-import { filterUniverse, holdersOf, type Coin } from "../lib/universe.ts";
+import { filterUniverse, holdersOf, thesisStrength, type Coin } from "../lib/universe.ts";
 import { fetchProtocolTvl, fetchProtocolFees, fetchChainTvl, fetchStablecoinSupply, type ProtocolTvlMetrics, type FeesSummary, type ChainTvl, type StablecoinSnapshot } from "../lib/onchain/defillama.ts";
 import { fetchBtcNetwork, type BtcNetworkState } from "../lib/onchain/btc.ts";
 import { fetchSolNetwork, type SolNetworkState } from "../lib/onchain/sol.ts";
@@ -99,6 +99,26 @@ async function processCoin(
       if (cat) categoryChange30d = cat.change24hPct; // 30d 정확한 데이터는 별도 endpoint 필요. 24h로 우선
     }
 
+    // 거래량 7일 평균 대비 ratio (십계명 #4)
+    let volumeRatio7d: number | undefined;
+    if (daily.candles.length >= 8) {
+      const last = daily.candles.at(-1)!;
+      const prev7 = daily.candles.slice(-8, -1);
+      const avg7 = prev7.reduce((s, c) => s + c.volume, 0) / 7;
+      if (avg7 > 0) volumeRatio7d = last.volume / avg7;
+    }
+
+    // 30일 실현 변동성 (일별 수익률 std × sqrt(365)) (십계명 #3)
+    let volatility30d: number | undefined;
+    if (daily.candles.length >= 31) {
+      const closes = daily.candles.slice(-31).map((c) => c.close);
+      const returns: number[] = [];
+      for (let i = 1; i < closes.length; i++) returns.push((closes[i] - closes[i - 1]) / closes[i - 1]);
+      const mean = returns.reduce((s, x) => s + x, 0) / returns.length;
+      const variance = returns.reduce((s, x) => s + (x - mean) ** 2, 0) / returns.length;
+      volatility30d = Math.sqrt(variance);
+    }
+
     const result = evaluate({
       base: coin.base,
       symbol: daily.symbol,
@@ -111,6 +131,9 @@ async function processCoin(
         fearGreed: macro.fearGreed?.current.value ?? null,
         btcDominance: macro.global?.btcDominance ?? null,
         categoryChange30d,
+        thesisStrength: thesisStrength(coin),
+        volumeRatio7d,
+        volatility30d,
       },
     });
     const source = daily.source === weekly.source ? daily.source : `${daily.source}/${weekly.source}`;

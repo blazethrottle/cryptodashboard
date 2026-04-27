@@ -29,6 +29,12 @@ export interface OnchainContext {
   btcDominance?: number | null;     // 0–1
   /** 코인이 속한 카테고리 30d 변화율 (CG categories) */
   categoryChange30d?: number | null;
+  /** Thesis 강도 (0~4) — Scenario X X-VIP + Grayscale 가중치 */
+  thesisStrength?: number;
+  /** Volume 7일 평균 대비 현재 비율 — 십계명 #4 거래량 시그널 */
+  volumeRatio7d?: number;
+  /** 30일 변동성 (실현 변동성 %) — 십계명 #3 변동성 시그널 */
+  volatility30d?: number;
 }
 
 export interface SignalSnapshot {
@@ -192,9 +198,51 @@ export function evaluate({ base, symbol, daily, weekly, onchain }: SignalInputs)
       reasons.push(`카테고리 30d +${(cat30 * 100).toFixed(0)}% (narrative 폭발)`);
       score += 2;
     } else if (cat30 <= -0.3) {
-      reasons.push(`카테고리 30d ${(cat30 * 100).toFixed(0)}% (narrative 침체 — Contrarian 기회)`);
-      // 음수 score 안 함 — 침체 자체는 매수 기회 가능 (Contrarian)
+      reasons.push(`카테고리 30d ${(cat30 * 100).toFixed(0)}% (narrative 침체 — 십계명 #9 대중 뒤안길 매수 기회)`);
+      // 침체 자체는 매수 기회 가능 (Contrarian, 십계명 #9)
+      // 단, 다른 매수 시그널과 결합해야 가중. 단독으론 score 0
     }
+  }
+
+  // X-VIP 십계명 #3 "변동성 = 애인" — 변동성 큰 + 가격 약세 = 매수 강화
+  const vol30 = onchain?.volatility30d;
+  if (typeof vol30 === "number" && Number.isFinite(price) && Number.isFinite(ma200)) {
+    const drawdown = (price - ma200) / ma200;  // 음수면 200MA 아래
+    if (vol30 >= 0.04 && drawdown <= -0.2) {
+      reasons.push(`변동성 ${(vol30 * 100).toFixed(1)}% + 200MA -20% 이하 (십계명 #3,#5 변동성 매수)`);
+      score += 1;
+    }
+  }
+
+  // X-VIP 십계명 #4 "거래량 = 가족" — Volume 7d 평균 대비 +50% = 추세 가속
+  const volRatio = onchain?.volumeRatio7d;
+  if (typeof volRatio === "number") {
+    if (volRatio >= 1.5 && rsiDaily <= 50) {
+      reasons.push(`Volume ${volRatio.toFixed(1)}x 평균 + RSI 약세 (십계명 #4 거래량 진입)`);
+      score += 1;
+    } else if (volRatio >= 2 && rsiDaily >= 70) {
+      reasons.push(`Volume ${volRatio.toFixed(1)}x 평균 + RSI 강세 (십계명 #8 호재 매도)`);
+      score -= 1;
+    }
+  }
+
+  // X-VIP 십계명 #6,#8 "하락장에 산다" — F&G Fear + 200MA 아래 + Stable supply 증가 = 강한 매수
+  if (
+    typeof fg === "number" && fg <= 30 &&
+    Number.isFinite(price) && Number.isFinite(ma200) && price < ma200
+  ) {
+    reasons.push(`Fear ${fg} + 200MA 아래 (십계명 #6,#8 하락장 악재 매수)`);
+    score += 1;
+  }
+
+  // Thesis 가중치 — Scenario X X-VIP core + Grayscale → 매수 우선순위
+  const ts = onchain?.thesisStrength ?? 0;
+  if (ts >= 3) {
+    reasons.push(`Thesis 강함 (X-VIP core + Grayscale)`);
+    score += 1;
+  } else if (ts >= 2) {
+    reasons.push(`Thesis 명확 (X-VIP 또는 Grayscale)`);
+    score += 0;  // 기본 가중치 — 수치는 안 더하고 reasons에만 명시
   }
 
   const level: SignalLevel =
