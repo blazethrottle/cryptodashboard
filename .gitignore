@@ -12,6 +12,7 @@ dist/
 **/dist/
 .next/
 .turbo/
+*.tsbuildinfo
 
 # 웹 빌드 시점에만 들어가는 데이터 (Actions가 자동 갱신)
 web/public/data/snapshot.json
