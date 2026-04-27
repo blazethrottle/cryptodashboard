@@ -5,6 +5,7 @@ data/snapshots/
 data/cache/
 data/institutions/
 data/backtests/
+data/trade-plans/
 .env
 .env.local
 *.log

@@ -22,6 +22,7 @@ import { fetchGlobalMarket, fetchCategories, altSeasonSignal, type GlobalMarket,
 import { fetchBtcCycle, btcCycleScore, type BtcCycleSnapshot } from "../lib/onchain/coinmetrics.ts";
 import { fetchPerpSnapshot, type PerpSnapshot } from "../lib/exchanges/binance-futures.ts";
 import { computeMultibaggerScore, type MultibaggerScore } from "../lib/multibagger.ts";
+import { loadActivePlans, evaluatePlan } from "../lib/tradeplan.ts";
 
 /** universe groups → CoinGecko category id 매핑 (가능한 것만, 없으면 null) */
 const GROUP_TO_CG_CATEGORY: Record<string, string> = {
@@ -480,6 +481,30 @@ async function main(): Promise<void> {
 
   const candleCount = await saveCandles(rows);
   console.log(`${COLORS.dim}📈 ${candleCount} 코인 candles → web/public/data/candles/${COLORS.reset}`);
+
+  // Trade Plan 자동 평가 (X-VIP 십계명 #5, #7)
+  const plans = await loadActivePlans(REPO_ROOT);
+  if (plans.length > 0) {
+    console.log();
+    console.log(`${COLORS.bold}🎯 Trade Plan 자동 평가 (${plans.length}개 active)${COLORS.reset}`);
+    let alertCount = 0;
+    for (const plan of plans) {
+      const row = rows.find((r) => r.coin.base === plan.coin && r.result);
+      if (!row?.result) continue;
+      const evalRes = evaluatePlan(plan, row.result.price);
+      if (evalRes.triggers.length > 0) {
+        alertCount += evalRes.triggers.length;
+        for (const t of evalRes.triggers) {
+          const color = t.type === "stopLoss" ? COLORS.red : COLORS.green;
+          const label = t.type === "stopLoss" ? "🚨 손절 트리거" : "🎯 익절 트리거";
+          console.log(`  ${color}${COLORS.bold}${label}${COLORS.reset}  ${plan.coin} @ ${fmt(row.result.price)} (${pct(evalRes.currentPnLPct)})`);
+          console.log(`    Plan: ${plan.id}  ·  trigger ${fmt(t.price)} × ${(t.fraction * 100).toFixed(0)}%`);
+          console.log(`    → 거래소에서 즉시 실행 후 \`npm run plan close ${plan.id} --price=<실제>\``);
+        }
+      }
+    }
+    if (alertCount === 0) console.log(`  ${COLORS.dim}모든 plan 정상 — 트리거 도달 없음${COLORS.reset}`);
+  }
 
   const errs = rows.filter((r) => r.error);
   if (errs.length > 0) {
