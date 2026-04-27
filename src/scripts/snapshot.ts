@@ -7,6 +7,7 @@
  *   npm run snapshot -- --no-onchain          # 온체인 데이터 fetch 끄기
  */
 
+import "dotenv/config";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +24,7 @@ import { fetchBtcCycle, btcCycleScore, type BtcCycleSnapshot } from "../lib/onch
 import { fetchPerpSnapshot, type PerpSnapshot } from "../lib/exchanges/binance-futures.ts";
 import { computeMultibaggerScore, type MultibaggerScore } from "../lib/multibagger.ts";
 import { loadActivePlans, evaluatePlan } from "../lib/tradeplan.ts";
+import { notifyAll, diffSignals, type PriorSnapshotMap } from "../lib/notify/index.ts";
 
 /** universe groups → CoinGecko category id 매핑 (가능한 것만, 없으면 null) */
 const GROUP_TO_CG_CATEGORY: Record<string, string> = {
@@ -155,6 +157,28 @@ async function processCoin(
  * priority + 시그널 발동 코인의 일봉 candles를 web/public/data/candles/<base>.json 으로 저장.
  * 차트용 raw 데이터. snapshot.json에는 미포함.
  */
+/**
+ * 직전 snapshot의 시그널 레벨 맵 — 변경 감지용. data/.prior-signals.json
+ */
+async function loadPriorSnapshotMap(): Promise<PriorSnapshotMap> {
+  const file = path.join(REPO_ROOT, "data", ".prior-signals.json");
+  try {
+    const raw = await fs.readFile(file, "utf-8");
+    return JSON.parse(raw) as PriorSnapshotMap;
+  } catch {
+    return {};
+  }
+}
+async function savePriorSnapshotMap(rows: CoinResult[]): Promise<void> {
+  const file = path.join(REPO_ROOT, "data", ".prior-signals.json");
+  const map: PriorSnapshotMap = {};
+  for (const r of rows) {
+    if (r.result) map[r.coin.base] = r.result.level;
+  }
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, JSON.stringify(map, null, 2));
+}
+
 async function saveCandles(rows: CoinResult[]): Promise<number> {
   const dir = path.join(REPO_ROOT, "web", "public", "data", "candles");
   await fs.mkdir(dir, { recursive: true });
@@ -482,28 +506,84 @@ async function main(): Promise<void> {
   const candleCount = await saveCandles(rows);
   console.log(`${COLORS.dim}📈 ${candleCount} 코인 candles → web/public/data/candles/${COLORS.reset}`);
 
-  // Trade Plan 자동 평가 (X-VIP 십계명 #5, #7)
+  // Trade Plan 자동 평가 (X-VIP 십계명 #5, #7) + 알림
   const plans = await loadActivePlans(REPO_ROOT);
+  const planAlerts: Array<{ plan: typeof plans[number]; trigger: ReturnType<typeof evaluatePlan>["triggers"][number]; price: number; pnlPct: number }> = [];
   if (plans.length > 0) {
     console.log();
     console.log(`${COLORS.bold}🎯 Trade Plan 자동 평가 (${plans.length}개 active)${COLORS.reset}`);
-    let alertCount = 0;
     for (const plan of plans) {
       const row = rows.find((r) => r.coin.base === plan.coin && r.result);
       if (!row?.result) continue;
       const evalRes = evaluatePlan(plan, row.result.price);
       if (evalRes.triggers.length > 0) {
-        alertCount += evalRes.triggers.length;
         for (const t of evalRes.triggers) {
           const color = t.type === "stopLoss" ? COLORS.red : COLORS.green;
           const label = t.type === "stopLoss" ? "🚨 손절 트리거" : "🎯 익절 트리거";
           console.log(`  ${color}${COLORS.bold}${label}${COLORS.reset}  ${plan.coin} @ ${fmt(row.result.price)} (${pct(evalRes.currentPnLPct)})`);
           console.log(`    Plan: ${plan.id}  ·  trigger ${fmt(t.price)} × ${(t.fraction * 100).toFixed(0)}%`);
           console.log(`    → 거래소에서 즉시 실행 후 \`npm run plan close ${plan.id} --price=<실제>\``);
+          planAlerts.push({ plan, trigger: t, price: row.result.price, pnlPct: evalRes.currentPnLPct });
         }
       }
     }
-    if (alertCount === 0) console.log(`  ${COLORS.dim}모든 plan 정상 — 트리거 도달 없음${COLORS.reset}`);
+    if (planAlerts.length === 0) console.log(`  ${COLORS.dim}모든 plan 정상 — 트리거 도달 없음${COLORS.reset}`);
+  }
+
+  // 시그널 변경 감지 + 알림 (직전 snapshot 비교)
+  const priorMap = await loadPriorSnapshotMap();
+  const diff = diffSignals(priorMap, rows);
+  await savePriorSnapshotMap(rows);
+
+  if (process.env.TELEGRAM_CHAT_ID || diff.newBuys.length || diff.newSells.length || planAlerts.length) {
+    console.log();
+    console.log(`${COLORS.bold}📢 알림 발송${COLORS.reset}`);
+
+    // 신규 매수
+    if (diff.newBuys.length > 0) {
+      const tickers = diff.newBuys.map((r) => r.coin.base).join(", ");
+      const details = diff.newBuys.slice(0, 5).map((r) => `${r.coin.base}: ${r.result!.reasons.slice(0, 2).join(" · ")}`);
+      const res = await notifyAll({
+        category: "signal-new-buy",
+        title: `신규 매수 시그널 ${diff.newBuys.length}개`,
+        message: tickers,
+        details,
+      });
+      console.log(`  매수: TG=${res.telegram ? "✓" : "✗"} mac=${res.macos ? "✓" : "✗"} ${res.errors.join(" / ")}`);
+    }
+
+    // 신규 매도
+    if (diff.newSells.length > 0) {
+      const tickers = diff.newSells.map((r) => r.coin.base).join(", ");
+      const details = diff.newSells.slice(0, 5).map((r) => `${r.coin.base}: ${r.result!.reasons.slice(0, 2).join(" · ")}`);
+      const res = await notifyAll({
+        category: "signal-new-sell",
+        title: `신규 매도 시그널 ${diff.newSells.length}개`,
+        message: tickers,
+        details,
+      });
+      console.log(`  매도: TG=${res.telegram ? "✓" : "✗"} mac=${res.macos ? "✓" : "✗"} ${res.errors.join(" / ")}`);
+    }
+
+    // Trade Plan 트리거
+    for (const a of planAlerts) {
+      const isStop = a.trigger.type === "stopLoss";
+      const res = await notifyAll({
+        category: isStop ? "plan-stop-loss" : "plan-take-profit",
+        title: `${isStop ? "손절" : "익절"} 트리거 — ${a.plan.coin}`,
+        message: `${fmt(a.price)} 도달 (${pct(a.pnlPct)})`,
+        details: [
+          `Plan: ${a.plan.id}`,
+          `Trigger: ${fmt(a.trigger.price)} × ${(a.trigger.fraction * 100).toFixed(0)}%`,
+          `즉시 거래소 실행 후 close 명령`,
+        ],
+      });
+      console.log(`  ${a.plan.coin}: TG=${res.telegram ? "✓" : "✗"} mac=${res.macos ? "✓" : "✗"} ${res.errors.join(" / ")}`);
+    }
+
+    if (diff.newBuys.length === 0 && diff.newSells.length === 0 && planAlerts.length === 0) {
+      console.log(`  ${COLORS.dim}전송할 알림 없음 (시그널 변경 없음 + plan 트리거 없음)${COLORS.reset}`);
+    }
   }
 
   const errs = rows.filter((r) => r.error);

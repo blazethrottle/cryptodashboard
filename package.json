@@ -18,6 +18,7 @@
     "web:snapshot": "npm run snapshot && mkdir -p web/public/data && LATEST=$(ls -t data/snapshots/*.json | head -1) && cp \"$LATEST\" web/public/data/snapshot.json && echo \"snapshot copied: $LATEST\"",
     "backtest": "tsx src/scripts/backtest.ts",
     "plan": "tsx src/scripts/plan.ts",
+    "telegram:setup": "tsx src/scripts/telegram-setup.ts",
     "test:indicators": "tsx src/scripts/test-indicators.ts",
     "typecheck": "tsc --noEmit"
   },
