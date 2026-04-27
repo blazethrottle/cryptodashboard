@@ -24,9 +24,29 @@ X-VIP 포트폴리오 + 기관 포트폴리오 매매 시그널 대시보드.
 
 ```bash
 npm install
-npm run snapshot           # 전체 유니버스
-npm run snapshot:core      # BTC/ETH/SOL/XRP만
+npm run snapshot              # 전체 유니버스 (priority 기본)
+npm run snapshot:core         # BTC/ETH/SOL/XRP만
+npm run institutions          # 기관 포트폴리오 분석
+npm run sync                  # snapshot → llm-wiki 동기화
+npm run sync -- --commit --push  # 동기화 후 llm-wiki에 자동 commit·push
+npm run brief                 # Claude Sonnet 4.6 + Vault context로 LLM brief
+npm run all                   # snapshot → institutions → sync → brief
 ```
+
+## Git 워크플로우
+
+**Repo**: https://github.com/blazethrottle/cryptodashboard
+
+- `main` — 보호된 기본 브랜치. PR로만 머지.
+- `dev` — Claude 자동 작업 브랜치. `git push origin dev` 자동화 적용.
+
+**최초 셋업 (사용자가 1회 직접 실행 필요)**:
+```bash
+git push -u origin main
+```
+이후 Claude는 `dev` 브랜치에 자동 commit/push, 사용자는 적당한 시점에 PR로 main에 머지.
+
+자세한 작업 룰은 `.claude/CLAUDE.md` 참조.
 
 결과는 콘솔 표 + `data/snapshots/<timestamp>.json`에 저장.
 
