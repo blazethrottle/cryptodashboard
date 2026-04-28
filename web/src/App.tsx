@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, Clock, RefreshCcw, AlertTriangle, ExternalLink, Bitcoin, Rocket, BarChart3 } from "lucide-react";
+import { Activity, Clock, RefreshCcw, AlertTriangle, ExternalLink, Bitcoin, Rocket, BarChart3, Building2 } from "lucide-react";
 import type { SnapshotFile } from "./types";
 import { fmtKR } from "./lib/format";
 import { MacroPanel } from "./components/MacroPanel";
@@ -9,10 +9,12 @@ import { InstitutionMatrix } from "./components/InstitutionMatrix";
 import { BtcTrack } from "./components/BtcTrack";
 import { AltTrack } from "./components/AltTrack";
 import { TradePlanPanel } from "./components/TradePlanPanel";
+import { InstitutionsSection } from "./components/InstitutionsSection";
+import { OnchainSection } from "./components/OnchainSection";
 
 const DATA_URL = `${import.meta.env.BASE_URL}data/snapshot.json`;
 
-type Track = "overview" | "btc" | "alt";
+type Track = "overview" | "btc" | "alt" | "onchain" | "institutions";
 
 export default function App() {
   const [data, setData] = useState<SnapshotFile | null>(null);
@@ -72,7 +74,7 @@ export default function App() {
       </header>
 
       {/* 트랙 토글 */}
-      <nav className="flex items-center gap-2 mb-6 border-b border-border pb-3">
+      <nav className="flex items-center gap-2 mb-6 border-b border-border pb-3 overflow-x-auto">
         <TrackBtn active={track === "overview"} onClick={() => setTrack("overview")} icon={<BarChart3 className="w-4 h-4" />}>
           Overview
         </TrackBtn>
@@ -81,6 +83,12 @@ export default function App() {
         </TrackBtn>
         <TrackBtn active={track === "alt"} onClick={() => setTrack("alt")} icon={<Rocket className="w-4 h-4 text-buy" />}>
           알트 멀티배거
+        </TrackBtn>
+        <TrackBtn active={track === "onchain"} onClick={() => setTrack("onchain")} icon={<Activity className="w-4 h-4 text-cyan-400" />}>
+          Onchain
+        </TrackBtn>
+        <TrackBtn active={track === "institutions"} onClick={() => setTrack("institutions")} icon={<Building2 className="w-4 h-4 text-accent" />}>
+          Institutions
         </TrackBtn>
       </nav>
 
@@ -117,6 +125,8 @@ export default function App() {
           )}
           {track === "btc" && <BtcTrack macro={data.macro} rows={data.rows} />}
           {track === "alt" && <AltTrack macro={data.macro} rows={data.rows} />}
+          {track === "onchain" && <OnchainSection macro={data.macro} rows={data.rows} />}
+          {track === "institutions" && <InstitutionsSection rows={data.rows} />}
           <Footer data={data} />
         </>
       )}
