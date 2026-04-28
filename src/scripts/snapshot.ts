@@ -25,6 +25,7 @@ import { fetchPerpSnapshot, type PerpSnapshot } from "../lib/exchanges/binance-f
 import { computeMultibaggerScore, type MultibaggerScore } from "../lib/multibagger.ts";
 import { loadActivePlans, evaluatePlan } from "../lib/tradeplan.ts";
 import { notifyAll, diffSignals, type PriorSnapshotMap } from "../lib/notify/index.ts";
+import { loadTimeseries, saveTimeseries, appendPoint, METRIC_DEFINITIONS } from "../lib/timeseries.ts";
 
 /** universe groups → CoinGecko category id 매핑 (가능한 것만, 없으면 null) */
 const GROUP_TO_CG_CATEGORY: Record<string, string> = {
@@ -505,6 +506,42 @@ async function main(): Promise<void> {
 
   const candleCount = await saveCandles(rows);
   console.log(`${COLORS.dim}📈 ${candleCount} 코인 candles → web/public/data/candles/${COLORS.reset}`);
+
+  // 시계열 누적 (data/timeseries.json) — 매 cycle 핵심 metric append
+  const ts = await loadTimeseries(REPO_ROOT);
+  const safeAppend = (key: keyof typeof METRIC_DEFINITIONS, value: number | undefined | null) => {
+    if (value == null || !Number.isFinite(value)) return;
+    appendPoint(ts, key, value, METRIC_DEFINITIONS[key]);
+  };
+  if (macro.btc) {
+    safeAppend("btc-hashrate-ehs", macro.btc.hashrate24hEhs);
+    safeAppend("btc-fee-fastest", macro.btc.feesSatPerVb.fastest);
+    safeAppend("btc-mempool-mb", macro.btc.mempoolVsizeMB);
+    safeAppend("btc-difficulty-change-pct", macro.btc.difficultyChangePct);
+  }
+  if (macro.btcCycle) {
+    safeAppend("btc-mvrv-z", macro.btcCycle.current.mvrvZ);
+    safeAppend("btc-mvrv", macro.btcCycle.current.mvrv);
+    safeAppend("btc-price", macro.btcCycle.current.price);
+  }
+  if (macro.sol) {
+    safeAppend("sol-tps", macro.sol.tps5min);
+    safeAppend("sol-epoch-progress", macro.sol.epochProgress * 100);
+  }
+  if (macro.chains?.Ethereum) safeAppend("eth-tvl-usd", macro.chains.Ethereum.tvl);
+  if (macro.chains?.Solana) safeAppend("sol-tvl-usd", macro.chains.Solana.tvl);
+  if (macro.global) {
+    safeAppend("btc-dominance", macro.global.btcDominance * 100);
+    safeAppend("eth-dominance", macro.global.ethDominance * 100);
+  }
+  if (macro.fearGreed) safeAppend("fear-greed", macro.fearGreed.current.value);
+  if (macro.stablecoins) safeAppend("stable-supply-usd", macro.stablecoins.totalUsd);
+  await saveTimeseries(REPO_ROOT, ts);
+  // web에도 복사 (정적 page에서 fetch)
+  const tsWebFile = path.join(REPO_ROOT, "web", "public", "data", "timeseries.json");
+  await fs.mkdir(path.dirname(tsWebFile), { recursive: true });
+  await fs.writeFile(tsWebFile, JSON.stringify(ts, null, 2));
+  console.log(`${COLORS.dim}📊 timeseries: ${Object.keys(ts.series).length} metric × ${Object.values(ts.series)[0]?.points.length ?? 0} points${COLORS.reset}`);
 
   // Trade Plan 자동 평가 (X-VIP 십계명 #5, #7) + 알림 + web export
   const plans = await loadActivePlans(REPO_ROOT);

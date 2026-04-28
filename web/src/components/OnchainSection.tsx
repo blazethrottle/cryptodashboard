@@ -3,6 +3,7 @@ import { Coins, Activity, Zap, Layers, BarChart3 } from "lucide-react";
 import type { Macro, Row } from "../types";
 import { fmtUsd, fmtPrice, fmtPct, fmtNum, levelEmoji } from "../lib/format";
 import { CoinChart } from "./CoinChart";
+import { TimeseriesChart } from "./TimeseriesChart";
 
 interface Props {
   macro: Macro;
@@ -224,6 +225,17 @@ function BtcOnchain({ macro }: { macro: Macro }) {
           </div>
         </div>
       )}
+
+      {/* BTC 시계열 차트 — 누적 데이터 (30분 cycle) */}
+      <div className="mt-4 pt-4 border-t border-border/40">
+        <h5 className="text-xs font-semibold text-muted mb-3 uppercase tracking-wider">최근 추세 (30분 간격 누적)</h5>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TimeseriesChart metric="btc-hashrate-ehs" title="해시레이트 (EH/s)" color="#eab308" />
+          <TimeseriesChart metric="btc-fee-fastest" title="수수료 (sat/vB)" color="#7c8aff" />
+          <TimeseriesChart metric="btc-mempool-mb" title="Mempool (MB)" color="#22c55e" />
+          <TimeseriesChart metric="btc-mvrv-z" title="MVRV-Z" color="#ef4444" />
+        </div>
+      </div>
     </section>
   );
 }
@@ -277,6 +289,14 @@ function EthOnchain({ macro, row }: { macro: Macro; row: Row | undefined }) {
       <p className="text-xs text-muted mt-3 italic">
         💡 ETH 전용 데이터 (gas, staking, ETF flow)는 추후 추가 예정. 현재는 가격·MA·DeFi TVL 기반.
       </p>
+
+      <div className="mt-4 pt-4 border-t border-border/40">
+        <h5 className="text-xs font-semibold text-muted mb-3 uppercase tracking-wider">최근 추세</h5>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TimeseriesChart metric="eth-tvl-usd" title="DeFi TVL (USD)" format="usd-short" color="#22c55e" />
+          <TimeseriesChart metric="eth-dominance" title="ETH Dominance (%)" color="#7c8aff" />
+        </div>
+      </div>
     </section>
   );
 }
@@ -321,6 +341,14 @@ function SolOnchain({ macro }: { macro: Macro }) {
             />
           </>
         )}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-border/40">
+        <h5 className="text-xs font-semibold text-muted mb-3 uppercase tracking-wider">최근 추세</h5>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TimeseriesChart metric="sol-tps" title="non-vote TPS" format="number" color="#22d3ee" />
+          <TimeseriesChart metric="sol-tvl-usd" title="DeFi TVL (USD)" format="usd-short" color="#22c55e" />
+        </div>
       </div>
     </section>
   );

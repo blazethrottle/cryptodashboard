@@ -1,6 +1,7 @@
-import { Activity, Coins, Layers, Wallet } from "lucide-react";
+import { Activity, Coins, Layers, Wallet, TrendingUp } from "lucide-react";
 import type { Macro } from "../types";
 import { fmtUsd, fmtPct } from "../lib/format";
+import { TimeseriesChart } from "./TimeseriesChart";
 
 interface Props {
   macro: Macro;
@@ -8,6 +9,7 @@ interface Props {
 
 export function MacroPanel({ macro }: Props) {
   return (
+    <>
     <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {macro.btc && (
         <Card title="Bitcoin 네트워크" icon={<Coins className="w-4 h-4 text-warn" />}>
@@ -66,6 +68,21 @@ export function MacroPanel({ macro }: Props) {
         </Card>
       )}
     </section>
+
+    {/* 시계열 추세 — 매크로 핵심 지표 */}
+    <section className="rounded-xl border border-border bg-surface p-4 mt-4">
+      <header className="flex items-center gap-2 text-sm font-semibold text-text mb-3">
+        <TrendingUp className="w-4 h-4 text-accent" />
+        매크로 추세 (30분 간격 누적)
+      </header>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <TimeseriesChart metric="fear-greed" title="Fear & Greed" color="#eab308" />
+        <TimeseriesChart metric="btc-dominance" title="BTC Dominance (%)" format="pct" color="#f59e0b" />
+        <TimeseriesChart metric="stable-supply-usd" title="Stablecoin Supply" format="usd-short" color="#22c55e" />
+        <TimeseriesChart metric="btc-price" title="BTC Price" format="usd-short" color="#7c8aff" />
+      </div>
+    </section>
+    </>
   );
 }
 

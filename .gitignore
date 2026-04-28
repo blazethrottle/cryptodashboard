@@ -7,6 +7,8 @@ data/institutions/
 data/backtests/
 data/trade-plans/
 data/.prior-signals.json
+# data/timeseries.json은 git tracked — Actions가 누적 commit
+
 .env
 .env.local
 *.log

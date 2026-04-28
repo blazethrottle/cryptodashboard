@@ -250,6 +250,24 @@ export interface PlansFile {
   evaluations: TradePlanEvaluation[];
 }
 
+// ── Timeseries ─────────────────────────────────────────────────────────────
+
+export interface TimeseriesPoint {
+  t: number;
+  v: number;
+}
+
+export interface SeriesSlot {
+  unit: string;
+  description: string;
+  points: TimeseriesPoint[];
+}
+
+export interface TimeseriesFile {
+  lastUpdated: string;
+  series: Record<string, SeriesSlot>;
+}
+
 export type Institution =
   | "Grayscale" | "Bitwise" | "21Shares" | "CoinShares" | "Pantera" | "Galaxy Digital" | "Paradigm";
 
