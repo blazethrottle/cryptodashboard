@@ -19,6 +19,7 @@
     "backtest": "tsx src/scripts/backtest.ts",
     "plan": "tsx src/scripts/plan.ts",
     "telegram:setup": "tsx src/scripts/telegram-setup.ts",
+    "weekly": "tsx src/scripts/weekly-brief.ts",
     "test:indicators": "tsx src/scripts/test-indicators.ts",
     "typecheck": "tsc --noEmit"
   },

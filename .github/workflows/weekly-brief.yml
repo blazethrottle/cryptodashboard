@@ -1,0 +1,41 @@
+name: Weekly Brief (Sunday KST 21:00)
+
+# 매주 일요일 KST 21:00 = UTC 12:00
+on:
+  schedule:
+    - cron: "0 12 * * 0"
+  workflow_dispatch:
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Run weekly brief
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run weekly
+
+      # 생성된 brief을 llm-wiki repo에 commit·push 하려면 별도 git 권한 필요.
+      # 현재는 Mac mini의 iCloud Drive 동기화로 vault에 자동 반영됨 (이 Actions는
+      # GitHub Actions runner이므로 실제로는 ephemeral). 향후 Mac mini launchd로
+      # 옮기거나, llm-wiki repo deploy key 추가하여 자동 push 가능.
+      - name: Show generated brief (artifact)
+        run: |
+          echo "Weekly brief 결과는 텔레그램으로 발송됨"
+          echo "Vault 자동 동기화는 Mac mini 로컬 실행 시 작동"
