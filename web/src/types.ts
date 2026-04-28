@@ -193,6 +193,63 @@ export interface CandleFile {
   }>;
 }
 
+// ── Trade Plan ─────────────────────────────────────────────────────────────
+
+export interface TakeProfitLeg {
+  price: number;
+  fraction: number;
+  triggered: boolean;
+  triggeredAt?: string;
+  triggeredPrice?: number;
+}
+
+export interface TradePlan {
+  id: string;
+  coin: string;
+  status: "open" | "closed" | "cancelled";
+  createdAt: string;
+  entry: {
+    plannedPrice?: number;
+    actualPrice: number;
+    enteredAt: string;
+    sizeUsd: number;
+    sizeCoin: number;
+    rationale: string;
+  };
+  stopLoss: {
+    price: number;
+    fraction: number;
+    triggered: boolean;
+    triggeredAt?: string;
+    triggeredPrice?: number;
+    rationale: string;
+  };
+  takeProfit: TakeProfitLeg[];
+  thesis: {
+    timeHorizon: "short" | "medium" | "long";
+    narrative: string;
+    validUntil?: string;
+  };
+}
+
+export interface TradePlanEvaluation {
+  plan: TradePlan;
+  currentPrice: number;
+  pnlUsd: number;
+  pnlPct: number;
+  triggers: Array<{
+    type: "stopLoss" | "takeProfit";
+    legIndex?: number;
+    price: number;
+    fraction: number;
+  }>;
+}
+
+export interface PlansFile {
+  timestamp: string;
+  evaluations: TradePlanEvaluation[];
+}
+
 export type Institution =
   | "Grayscale" | "Bitwise" | "21Shares" | "CoinShares" | "Pantera" | "Galaxy Digital" | "Paradigm";
 

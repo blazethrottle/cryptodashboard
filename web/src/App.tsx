@@ -8,6 +8,7 @@ import { AllCoinsTable } from "./components/AllCoinsTable";
 import { InstitutionMatrix } from "./components/InstitutionMatrix";
 import { BtcTrack } from "./components/BtcTrack";
 import { AltTrack } from "./components/AltTrack";
+import { TradePlanPanel } from "./components/TradePlanPanel";
 
 const DATA_URL = `${import.meta.env.BASE_URL}data/snapshot.json`;
 
@@ -108,6 +109,7 @@ export default function App() {
           {track === "overview" && (
             <div className="space-y-6">
               <MacroPanel macro={data.macro} />
+              <TradePlanPanel />
               <SignalCards rows={data.rows} />
               <InstitutionMatrix rows={data.rows} />
               <AllCoinsTable rows={data.rows} />

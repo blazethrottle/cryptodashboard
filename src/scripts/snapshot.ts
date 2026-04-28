@@ -506,9 +506,10 @@ async function main(): Promise<void> {
   const candleCount = await saveCandles(rows);
   console.log(`${COLORS.dim}📈 ${candleCount} 코인 candles → web/public/data/candles/${COLORS.reset}`);
 
-  // Trade Plan 자동 평가 (X-VIP 십계명 #5, #7) + 알림
+  // Trade Plan 자동 평가 (X-VIP 십계명 #5, #7) + 알림 + web export
   const plans = await loadActivePlans(REPO_ROOT);
   const planAlerts: Array<{ plan: typeof plans[number]; trigger: ReturnType<typeof evaluatePlan>["triggers"][number]; price: number; pnlPct: number }> = [];
+  const planEvaluations: Array<{ plan: typeof plans[number]; currentPrice: number; pnlUsd: number; pnlPct: number; triggers: ReturnType<typeof evaluatePlan>["triggers"] }> = [];
   if (plans.length > 0) {
     console.log();
     console.log(`${COLORS.bold}🎯 Trade Plan 자동 평가 (${plans.length}개 active)${COLORS.reset}`);
@@ -516,6 +517,13 @@ async function main(): Promise<void> {
       const row = rows.find((r) => r.coin.base === plan.coin && r.result);
       if (!row?.result) continue;
       const evalRes = evaluatePlan(plan, row.result.price);
+      planEvaluations.push({
+        plan,
+        currentPrice: row.result.price,
+        pnlUsd: evalRes.currentPnLUsd,
+        pnlPct: evalRes.currentPnLPct,
+        triggers: evalRes.triggers,
+      });
       if (evalRes.triggers.length > 0) {
         for (const t of evalRes.triggers) {
           const color = t.type === "stopLoss" ? COLORS.red : COLORS.green;
@@ -529,6 +537,14 @@ async function main(): Promise<void> {
     }
     if (planAlerts.length === 0) console.log(`  ${COLORS.dim}모든 plan 정상 — 트리거 도달 없음${COLORS.reset}`);
   }
+
+  // Plan 평가 결과를 web에 export (UI 표시용)
+  const plansWebFile = path.join(REPO_ROOT, "web", "public", "data", "plans.json");
+  await fs.mkdir(path.dirname(plansWebFile), { recursive: true });
+  await fs.writeFile(
+    plansWebFile,
+    JSON.stringify({ timestamp: new Date().toISOString(), evaluations: planEvaluations }, null, 2),
+  );
 
   // 시그널 변경 감지 + 알림 (직전 snapshot 비교)
   const priorMap = await loadPriorSnapshotMap();
