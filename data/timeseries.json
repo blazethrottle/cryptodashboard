@@ -1,0 +1,125 @@
+{
+  "lastUpdated": "2026-04-29T02:17:02.414Z",
+  "series": {
+    "btc-hashrate-ehs": {
+      "unit": "EH/s",
+      "description": "BTC 24h 평균 해시레이트",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 927.5190819018491
+        }
+      ]
+    },
+    "btc-fee-fastest": {
+      "unit": "sat/vB",
+      "description": "BTC fastest 수수료",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 2
+        }
+      ]
+    },
+    "btc-mempool-mb": {
+      "unit": "MB",
+      "description": "BTC mempool 크기",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 33.19747734069824
+        }
+      ]
+    },
+    "btc-difficulty-change-pct": {
+      "unit": "%",
+      "description": "BTC 다음 난이도 조정 예상",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": -2.6965129345053906
+        }
+      ]
+    },
+    "sol-tps": {
+      "unit": "tx/s",
+      "description": "SOL non-vote TPS (5분 평균)",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 1341.37
+        }
+      ]
+    },
+    "sol-epoch-progress": {
+      "unit": "%",
+      "description": "SOL epoch 진행률",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 75.69791666666667
+        }
+      ]
+    },
+    "eth-tvl-usd": {
+      "unit": "USD",
+      "description": "Ethereum DeFi TVL",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 44928128813
+        }
+      ]
+    },
+    "sol-tvl-usd": {
+      "unit": "USD",
+      "description": "Solana DeFi TVL",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 5454818574
+        }
+      ]
+    },
+    "btc-dominance": {
+      "unit": "%",
+      "description": "BTC dominance",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 58.01925561630258
+        }
+      ]
+    },
+    "eth-dominance": {
+      "unit": "%",
+      "description": "ETH dominance",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 10.472051114803897
+        }
+      ]
+    },
+    "fear-greed": {
+      "unit": "0-100",
+      "description": "Crypto Fear & Greed Index",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 26
+        }
+      ]
+    },
+    "stable-supply-usd": {
+      "unit": "USD",
+      "description": "Stablecoin 총 공급",
+      "points": [
+        {
+          "t": 1777429022414,
+          "v": 318591747382.25
+        }
+      ]
+    }
+  }
+}
