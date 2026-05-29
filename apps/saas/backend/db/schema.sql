@@ -64,3 +64,96 @@ alter table auth_audit_log enable row level security;
 drop policy if exists audit_self_select on auth_audit_log;
 create policy audit_self_select on auth_audit_log
   for select using (auth.uid() = user_id);
+
+-- Subscription module schema (Phase 1, 2026-05-29)
+
+create type subscription_status as enum (
+  'trialing', 'active', 'past_due', 'canceled', 'expired'
+);
+
+create type payment_provider as enum ('toss', 'stripe');
+
+create table if not exists subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  provider payment_provider not null,
+  provider_subscription_id text not null,
+  tier user_tier not null,
+  status subscription_status not null default 'trialing',
+  current_period_start timestamptz not null,
+  current_period_end timestamptz not null,
+  cancel_at_period_end boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (provider, provider_subscription_id)
+);
+
+create index if not exists subscriptions_user_idx
+  on subscriptions(user_id, status);
+
+drop trigger if exists trg_subscriptions_updated on subscriptions;
+create trigger trg_subscriptions_updated
+before update on subscriptions
+for each row execute function set_updated_at();
+
+alter table subscriptions enable row level security;
+
+drop policy if exists subscriptions_self_select on subscriptions;
+create policy subscriptions_self_select on subscriptions
+  for select using (auth.uid() = user_id);
+
+-- Payment webhook events (Toss·Stripe 멱등성 보장)
+create table if not exists payment_events (
+  id uuid primary key default gen_random_uuid(),
+  provider payment_provider not null,
+  provider_event_id text not null,
+  event_type text not null,
+  user_id uuid references users(id) on delete set null,
+  subscription_id uuid references subscriptions(id) on delete set null,
+  payload jsonb not null,
+  processed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (provider, provider_event_id)
+);
+
+create index if not exists payment_events_user_idx
+  on payment_events(user_id, created_at desc);
+create index if not exists payment_events_unprocessed_idx
+  on payment_events(processed_at) where processed_at is null;
+
+alter table payment_events enable row level security;
+
+drop policy if exists payment_events_self_select on payment_events;
+create policy payment_events_self_select on payment_events
+  for select using (auth.uid() = user_id);
+
+-- Signal module schema (Phase 1 placeholder, Phase 2에서 채움)
+create type signal_kind as enum ('buy', 'sell', 'hold');
+
+create table if not exists signals (
+  id uuid primary key default gen_random_uuid(),
+  coin text not null,
+  signal_type signal_kind not null,
+  rsi_daily numeric,
+  rsi_weekly numeric,
+  ma_50 numeric,
+  ma_200 numeric,
+  source_lag_days integer not null default 0,
+  computed_at timestamptz not null default now()
+);
+
+create index if not exists signals_coin_idx on signals(coin, computed_at desc);
+
+-- Brief module schema (Phase 1 placeholder)
+create table if not exists briefs (
+  id uuid primary key default gen_random_uuid(),
+  generated_for_date date not null,
+  language text not null default 'ko',
+  content_markdown text not null,
+  sources jsonb not null default '[]'::jsonb,
+  confidence_score numeric,
+  created_at timestamptz not null default now(),
+  unique (generated_for_date, language)
+);
+
+create index if not exists briefs_date_idx on briefs(generated_for_date desc);
