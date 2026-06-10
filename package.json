@@ -21,6 +21,9 @@
     "telegram:setup": "tsx src/scripts/telegram-setup.ts",
     "weekly": "tsx src/scripts/weekly-brief.ts",
     "test:indicators": "tsx src/scripts/test-indicators.ts",
+    "btc:index": "tsx src/scripts/btc-index-build.ts",
+    "btc:update": "tsx src/scripts/btc-index-update.ts",
+    "btc:verify": "tsx src/scripts/btc-metrics-verify.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
