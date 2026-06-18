@@ -33,6 +33,22 @@ npm run brief                 # Claude Sonnet 4.6 + Vault context로 LLM brief
 npm run all                   # snapshot → institutions → sync → brief
 ```
 
+## BTC 온체인 원천 파이프라인 (Phase 0 — 스캐폴딩)
+
+CoinMetrics 가공 지표 의존을 끊고 비트코인 원장에서 Realized Cap / MVRV / NUPL / SOPR를
+직접 산출하기 위한 기초 공사. 설계·로드맵: `docs/btc-onchain-raw-source-design.md`,
+배경 리서치: `docs/btc-financial-infrastructure-research.md`
+
+```bash
+npm run btc:index -- --selftest   # Phase 0 스캐폴딩 검증 (store/oracle 더미 왕복)
+npm run btc:index                 # 과거 전체 인덱스 일괄 구축 (Phase 1 구현 예정)
+npm run btc:update                # tip까지 증분 갱신 (Phase 1 구현 예정)
+npm run btc:verify                # 자체 Realized Cap vs CoinMetrics 회귀 대조
+```
+
+현재 상태: 계약(`src/lib/onchain/raw/types.ts`) · 가격 오라클 · JSON 인덱스 저장소 ·
+검증 스크립트까지 완료. `RawChainSource` 구현체(BigQuery → 자체 노드)가 Phase 1/3 작업.
+
 ## 웹 대시보드 (GitHub Pages)
 
 배포 URL (Actions 첫 실행 후): **https://blazethrottle.github.io/cryptodashboard/**
