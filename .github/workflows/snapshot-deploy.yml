@@ -1,9 +1,9 @@
 name: Snapshot + Deploy to Pages
 
-# 30분마다 자동 실행 + 코드 변경 시 + 수동 트리거
+# 매시간 자동 실행 + 코드 변경 시 + 수동 트리거
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
   push:
     branches: [dev]
@@ -92,8 +92,18 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deploy1.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (attempt 1)
+        id: deploy1
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait before retry (transient Pages failure)
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 60
+
+      - name: Deploy to GitHub Pages (retry)
         id: deployment
+        if: steps.deploy1.outcome == 'failure'
         uses: actions/deploy-pages@v4
