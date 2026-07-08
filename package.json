@@ -21,6 +21,7 @@
     "telegram:setup": "tsx src/scripts/telegram-setup.ts",
     "weekly": "tsx src/scripts/weekly-brief.ts",
     "test:indicators": "tsx src/scripts/test-indicators.ts",
+    "test:cryptoquant": "tsx src/scripts/test-cryptoquant.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

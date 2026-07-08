@@ -21,6 +21,7 @@ import { fetchSolNetwork, type SolNetworkState } from "../lib/onchain/sol.ts";
 import { fetchFearGreed, type FearGreedSnapshot } from "../lib/macro/fear-greed.ts";
 import { fetchGlobalMarket, fetchCategories, altSeasonSignal, type GlobalMarket, type CategoryStat } from "../lib/macro/coingecko-global.ts";
 import { fetchBtcCycle, btcCycleScore, type BtcCycleSnapshot } from "../lib/onchain/coinmetrics.ts";
+import { fetchCryptoQuantSnapshot, cryptoQuantReasons, type CryptoQuantSnapshot } from "../lib/cryptoquant.ts";
 import { fetchPerpSnapshot, type PerpSnapshot } from "../lib/exchanges/binance-futures.ts";
 import { computeMultibaggerScore, type MultibaggerScore } from "../lib/multibagger.ts";
 import { loadActivePlans, evaluatePlan } from "../lib/tradeplan.ts";
@@ -79,6 +80,7 @@ interface MacroContext {
   categories?: CategoryStat[];
   altSeason?: ReturnType<typeof altSeasonSignal>;
   btcCycle?: BtcCycleSnapshot;
+  cryptoQuant?: CryptoQuantSnapshot;
 }
 
 async function processCoin(
@@ -241,7 +243,7 @@ async function fetchOnchainForUniverse(coins: Coin[]): Promise<{
 }
 
 async function fetchMacro(): Promise<MacroContext> {
-  const [btcRes, solRes, chainsRes, stableRes, fgRes, globalRes, catsRes, cycleRes] = await Promise.allSettled([
+  const [btcRes, solRes, chainsRes, stableRes, fgRes, globalRes, catsRes, cycleRes, cqRes] = await Promise.allSettled([
     fetchBtcNetwork(),
     fetchSolNetwork(),
     Promise.all([
@@ -256,6 +258,7 @@ async function fetchMacro(): Promise<MacroContext> {
     fetchGlobalMarket(),
     fetchCategories(),
     fetchBtcCycle(365),
+    fetchCryptoQuantSnapshot(),
   ]);
   const chains: Record<string, ChainTvl | null> = {};
   if (chainsRes.status === "fulfilled") {
@@ -277,6 +280,7 @@ async function fetchMacro(): Promise<MacroContext> {
     categories: catsRes.status === "fulfilled" ? catsRes.value : undefined,
     altSeason: global ? altSeasonSignal(global.btcDominance) : undefined,
     btcCycle: cycleRes.status === "fulfilled" ? cycleRes.value : undefined,
+    cryptoQuant: cqRes.status === "fulfilled" ? cqRes.value : undefined,
   };
 }
 
@@ -394,6 +398,17 @@ function printMacro(macro: MacroContext): void {
     console.log(`  ${c.yellow}🔆${c.reset}  BTC MVRV-Z ${c.bold}${z.toFixed(2)}${c.reset}  ${stateLabel[state]} ${c.dim}score ${score.score >= 0 ? "+" : ""}${score.score}${c.reset}`);
     if (score.reasons.length > 0) {
       for (const r of score.reasons) console.log(`     ${c.dim}↳ ${r}${c.reset}`);
+    }
+  }
+  // CryptoQuant — 거래소 유출입·고래·LTH 행동 (API 키 없으면 생략)
+  if (macro.cryptoQuant) {
+    const cq = macro.cryptoQuant;
+    console.log(`  ${c.yellow}🐋${c.reset}  CryptoQuant`);
+    const reasons = cryptoQuantReasons(cq);
+    if (reasons.length > 0) {
+      for (const r of reasons) console.log(`     ${c.dim}↳ ${r}${c.reset}`);
+    } else {
+      console.log(`     ${c.dim}↳ 특이 신호 없음${c.reset}`);
     }
   }
 }
@@ -536,6 +551,25 @@ async function main(): Promise<void> {
   }
   if (macro.fearGreed) safeAppend("fear-greed", macro.fearGreed.current.value);
   if (macro.stablecoins) safeAppend("stable-supply-usd", macro.stablecoins.totalUsd);
+  // CryptoQuant metric은 timeseries.ts(변경 금지 파일) 수정 없이 appendPoint 직접 호출로 등록
+  if (macro.cryptoQuant?.exchangeWhaleRatio) {
+    appendPoint(ts, "btc-cq-exchange-whale-ratio", macro.cryptoQuant.exchangeWhaleRatio.ratio, {
+      unit: "ratio",
+      description: "BTC CryptoQuant Exchange Whale Ratio",
+    });
+  }
+  if (macro.cryptoQuant?.exchangeNetflow) {
+    appendPoint(ts, "btc-cq-exchange-netflow", macro.cryptoQuant.exchangeNetflow.btc, {
+      unit: "BTC",
+      description: "BTC CryptoQuant 거래소 순유입",
+    });
+  }
+  if (macro.cryptoQuant?.sopr) {
+    appendPoint(ts, "btc-cq-lth-sopr", macro.cryptoQuant.sopr.lthSopr, {
+      unit: "ratio",
+      description: "BTC CryptoQuant LTH-SOPR",
+    });
+  }
   await saveTimeseries(REPO_ROOT, ts);
   // web에도 복사 (정적 page에서 fetch)
   const tsWebFile = path.join(REPO_ROOT, "web", "public", "data", "timeseries.json");

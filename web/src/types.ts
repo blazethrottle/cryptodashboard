@@ -142,6 +142,13 @@ export interface AltSeasonSignal {
   comment: string;
 }
 
+export interface CryptoQuantSnapshot {
+  exchangeNetflow: { date: string; btc: number } | null;
+  exchangeWhaleRatio: { date: string; ratio: number } | null;
+  sopr: { date: string; sopr: number; sthSopr: number; lthSopr: number } | null;
+  cdd: { date: string; saCdd: number; aboveAverage: boolean } | null;
+}
+
 export interface PerpSnapshot {
   symbol: string;
   fundingRate: number;
@@ -177,6 +184,7 @@ export interface Macro {
   categories?: CategoryStat[];
   altSeason?: AltSeasonSignal;
   btcCycle?: BtcCycleSnapshot;
+  cryptoQuant?: CryptoQuantSnapshot;
 }
 
 export interface CandleFile {

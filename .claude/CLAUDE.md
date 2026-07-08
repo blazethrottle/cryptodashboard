@@ -43,6 +43,7 @@
 
 - `src/lib/exchanges/` — Binance + CoinGecko (절대 secret 하드코딩 X)
 - `src/lib/onchain/` — DefiLlama, mempool.space, Solana RPC
+- `src/lib/cryptoquant.ts` — CryptoQuant 유료 API (거래소 유출입·고래 비율·LTH-SOPR·CDD). `onchain/`과 별도 파일: API 키 없으면 undefined, 표시 전용(signals.ts 미반영)
 - `src/lib/indicators.ts` — RSI/SMA 등 순수 함수, I/O 없음
 - `src/lib/signals.ts` — 사용자 매매 룰 (변경 금지: RSI 30/70, 일봉 50/80 + 50일선, 200일선)
 - `src/lib/wiki/` — llm-wiki 동기화 (~/.../iCloud~md~obsidian/Documents/llm-wiki)
@@ -59,6 +60,6 @@
 
 ## 보안
 
-- ANTHROPIC_API_KEY는 .env (gitignored)에서만
+- ANTHROPIC_API_KEY·CRYPTOQUANT_API_KEY는 .env (gitignored)에서만
 - node_modules, data/snapshots, data/institutions 모두 gitignore
 - .claude/settings.local.json도 gitignore (사용자별 권한 설정)

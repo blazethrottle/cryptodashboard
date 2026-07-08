@@ -226,6 +226,47 @@ function BtcOnchain({ macro }: { macro: Macro }) {
         </div>
       )}
 
+      {/* CryptoQuant — 거래소 유출입·고래·LTH 행동 (API 키 미설정 시 생략) */}
+      {macro.cryptoQuant && (
+        <div className="mt-4 pt-4 border-t border-border/40">
+          <h5 className="text-xs font-semibold text-muted mb-2 uppercase tracking-wider">고래·장기보유자 흐름 (CryptoQuant)</h5>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            {macro.cryptoQuant.exchangeWhaleRatio && (
+              <Stat
+                label="Exchange Whale Ratio"
+                value={macro.cryptoQuant.exchangeWhaleRatio.ratio.toFixed(2)}
+                hint="상위 10개 입금 비중"
+                tone={macro.cryptoQuant.exchangeWhaleRatio.ratio >= 0.5 ? "sell" : undefined}
+              />
+            )}
+            {macro.cryptoQuant.exchangeNetflow && (
+              <Stat
+                label="Exchange Netflow"
+                value={`${macro.cryptoQuant.exchangeNetflow.btc >= 0 ? "+" : ""}${macro.cryptoQuant.exchangeNetflow.btc.toFixed(0)} BTC`}
+                hint={macro.cryptoQuant.exchangeNetflow.btc > 0 ? "유입 (잠재 매도압력)" : "유출 (보유 성향)"}
+                tone={macro.cryptoQuant.exchangeNetflow.btc > 0 ? "sell" : "buy"}
+              />
+            )}
+            {macro.cryptoQuant.sopr && (
+              <Stat
+                label="LTH-SOPR"
+                value={macro.cryptoQuant.sopr.lthSopr.toFixed(2)}
+                hint="장기보유자 수익실현 배율"
+                tone={macro.cryptoQuant.sopr.lthSopr < 1 ? "buy" : undefined}
+              />
+            )}
+            {macro.cryptoQuant.cdd && (
+              <Stat
+                label="CDD (평균 대비)"
+                value={macro.cryptoQuant.cdd.aboveAverage ? "상회" : "평균 이하"}
+                hint="오래된 코인 이동 규모"
+                tone={macro.cryptoQuant.cdd.aboveAverage ? "sell" : undefined}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* BTC 시계열 차트 — 누적 데이터 (30분 cycle) */}
       <div className="mt-4 pt-4 border-t border-border/40">
         <h5 className="text-xs font-semibold text-muted mb-3 uppercase tracking-wider">최근 추세 (30분 간격 누적)</h5>
@@ -234,6 +275,15 @@ function BtcOnchain({ macro }: { macro: Macro }) {
           <TimeseriesChart metric="btc-fee-fastest" title="수수료 (sat/vB)" color="#7c8aff" />
           <TimeseriesChart metric="btc-mempool-mb" title="Mempool (MB)" color="#22c55e" />
           <TimeseriesChart metric="btc-mvrv-z" title="MVRV-Z" color="#ef4444" />
+          {macro.cryptoQuant?.exchangeWhaleRatio && (
+            <TimeseriesChart metric="btc-cq-exchange-whale-ratio" title="Exchange Whale Ratio" color="#f97316" />
+          )}
+          {macro.cryptoQuant?.exchangeNetflow && (
+            <TimeseriesChart metric="btc-cq-exchange-netflow" title="Exchange Netflow (BTC)" color="#06b6d4" />
+          )}
+          {macro.cryptoQuant?.sopr && (
+            <TimeseriesChart metric="btc-cq-lth-sopr" title="LTH-SOPR" color="#a855f7" />
+          )}
         </div>
       </div>
     </section>
